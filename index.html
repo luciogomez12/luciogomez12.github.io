@@ -152,7 +152,8 @@
     .card:hover { box-shadow: var(--shadow-hover); }
 
     /* Transiciones suaves en los elementos interactivos */
-    .btn-tema, .btn-youtube, .btn-primary, .btn-borrar, .btn-link, input[type="text"] {
+    .btn-tema, .btn-youtube, .btn-primary, .btn-secundario, .btn-borrar, .btn-link,
+    input[type="text"], input[type="email"] {
       transition: background-color .15s ease, color .15s ease, border-color .15s ease,
                   box-shadow .15s ease, transform .15s ease;
     }
@@ -164,7 +165,7 @@
 
     /* Tareas */
     form { display: flex; gap: 8px; margin-bottom: 16px; }
-    input[type="text"] {
+    input[type="text"], input[type="email"] {
       flex: 1; min-width: 0;
       font: inherit;
       padding: 10px 14px;
@@ -173,7 +174,7 @@
       background: var(--bg);
       color: var(--text);
     }
-    input[type="text"]:focus {
+    input[type="text"]:focus, input[type="email"]:focus {
       outline: 2px solid var(--accent);
       outline-offset: 1px;
       border-color: transparent;
@@ -231,6 +232,27 @@
     .btn-link:hover { color: var(--danger); }
     [hidden] { display: none !important; }
 
+    /* Sincronización con Supabase */
+    .aviso { margin: 12px 0 0; font-size: .9rem; color: var(--danger); }
+    .cuenta {
+      margin-top: 20px; padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: .9rem; color: var(--muted);
+    }
+    .cuenta form { margin-bottom: 8px; }
+    .cuenta .nota { margin: 0; }
+    .btn-secundario {
+      padding: 10px 16px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-secundario:hover { background: var(--accent); color: #fff; }
+    .sesion {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin-bottom: 4px;
+    }
+
     footer {
       text-align: center;
       color: var(--muted);
@@ -278,13 +300,36 @@
           <span id="contador"></span>
           <button type="button" class="btn-link" id="borrar-hechas">Borrar completadas</button>
         </div>
+        <p class="aviso" id="aviso" role="status" hidden></p>
+
+        <div class="cuenta" id="cuenta" hidden>
+          <form id="form-cuenta">
+            <input type="email" id="email" placeholder="Tu email" autocomplete="email" aria-label="Email" required>
+            <button type="submit" class="btn-secundario">Sincronizar</button>
+          </form>
+          <div class="sesion" id="sesion" hidden>
+            <span id="sesion-texto"></span>
+            <button type="button" class="btn-link" id="cerrar-sesion">Cerrar sesión</button>
+          </div>
+          <p class="nota" id="nota-cuenta"></p>
+        </div>
       </section>
     </main>
 
     <footer>© <span id="anio"></span> Lucio Gómez</footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script>
+    // ✏️ Datos de tu proyecto de Supabase (Project Settings → API).
+    // La clave "publishable" es pública a propósito: la seguridad la dan las reglas RLS de la tabla.
+    const SUPABASE_URL = 'https://bxaaxfbrwxcdeypsfzxr.supabase.co';
+    const SUPABASE_CLAVE = 'sb_publishable_W1MCKRESNdk1FFGoTUy8fQ_06FEMAfJ';
+    const sb = (SUPABASE_URL && SUPABASE_CLAVE && window.supabase)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_CLAVE)
+      : null;
+    let usuario = null; // con sesión iniciada, las tareas viven en Supabase; sin ella, en localStorage
+
     const CLAVE = 'mis-tareas';
     const lista = document.getElementById('lista');
     const form = document.getElementById('form-tarea');
@@ -304,6 +349,7 @@
     }
 
     function guardar() {
+      if (usuario) return; // en modo sincronizado cada cambio ya se guardó en Supabase
       try {
         localStorage.setItem(CLAVE, JSON.stringify(tareas));
       } catch {
@@ -323,7 +369,11 @@
         check.type = 'checkbox';
         check.checked = t.hecha;
         check.setAttribute('aria-label', 'Marcar como completada');
-        check.addEventListener('change', () => {
+        check.addEventListener('change', async () => {
+          if (usuario) {
+            const { error } = await sb.from('tareas').update({ hecha: check.checked }).eq('id', t.id);
+            if (error) { check.checked = t.hecha; return avisar('No se pudo guardar el cambio.'); }
+          }
           t.hecha = check.checked;
           actualizar();
         });
@@ -336,7 +386,11 @@
         borrar.className = 'btn-borrar';
         borrar.textContent = '×';
         borrar.setAttribute('aria-label', 'Borrar tarea');
-        borrar.addEventListener('click', () => {
+        borrar.addEventListener('click', async () => {
+          if (usuario) {
+            const { error } = await sb.from('tareas').delete().eq('id', t.id);
+            if (error) return avisar('No se pudo borrar la tarea.');
+          }
           tareas = tareas.filter(x => x.id !== t.id);
           actualizar();
         });
@@ -353,24 +407,117 @@
     }
 
     function actualizar() {
+      avisar('');
       guardar();
       pintar();
     }
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       const texto = entrada.value.trim();
       if (!texto) return;
-      tareas.push({ id: Date.now() + Math.random(), texto, hecha: false });
       entrada.value = '';
       entrada.focus();
+      if (usuario) {
+        const { data, error } = await sb.from('tareas').insert({ texto }).select('id, texto, hecha').single();
+        if (error) { entrada.value = texto; return avisar('No se pudo guardar la tarea.'); }
+        tareas.push(data);
+      } else {
+        tareas.push({ id: Date.now() + Math.random(), texto, hecha: false });
+      }
       actualizar();
     });
 
-    borrarHechas.addEventListener('click', () => {
+    borrarHechas.addEventListener('click', async () => {
+      if (usuario) {
+        const ids = tareas.filter(t => t.hecha).map(t => t.id);
+        const { error } = await sb.from('tareas').delete().in('id', ids);
+        if (error) return avisar('No se pudieron borrar las tareas.');
+      }
       tareas = tareas.filter(t => !t.hecha);
       actualizar();
     });
+
+    // Sincronización con Supabase (inicio de sesión con enlace por email)
+    const aviso = document.getElementById('aviso');
+    const cuenta = document.getElementById('cuenta');
+    const formCuenta = document.getElementById('form-cuenta');
+    const email = document.getElementById('email');
+    const sesion = document.getElementById('sesion');
+    const sesionTexto = document.getElementById('sesion-texto');
+    const notaCuenta = document.getElementById('nota-cuenta');
+
+    function avisar(mensaje) {
+      aviso.textContent = mensaje;
+      aviso.hidden = !mensaje;
+    }
+
+    function pintarCuenta() {
+      formCuenta.hidden = !!usuario;
+      sesion.hidden = !usuario;
+      sesionTexto.textContent = usuario ? `Sincronizado como ${usuario.email}` : '';
+      notaCuenta.textContent = usuario
+        ? 'Tus tareas se guardan en la nube y las ves en todos tus dispositivos.'
+        : 'Ahora tus tareas se guardan solo en este navegador. Entra con tu email para verlas en todos tus dispositivos.';
+    }
+
+    async function cargarRemoto() {
+      const { data, error } = await sb.from('tareas').select('id, texto, hecha').order('creada');
+      if (error) return avisar('No se pudieron cargar las tareas.');
+      tareas = data;
+      actualizar();
+    }
+
+    async function alEntrar(u) {
+      usuario = u;
+      pintarCuenta();
+      // Sube una sola vez las tareas que hubiera en este navegador y las quita de aquí.
+      const locales = cargar();
+      if (locales.length) {
+        const { error } = await sb.from('tareas').insert(locales.map(t => ({ texto: t.texto, hecha: t.hecha })));
+        if (!error) { try { localStorage.removeItem(CLAVE); } catch {} }
+      }
+      await cargarRemoto();
+    }
+
+    if (sb) {
+      cuenta.hidden = false;
+      pintarCuenta();
+
+      formCuenta.addEventListener('submit', async e => {
+        e.preventDefault();
+        const { error } = await sb.auth.signInWithOtp({
+          email: email.value.trim(),
+          options: { emailRedirectTo: location.origin + location.pathname }
+        });
+        notaCuenta.textContent = error
+          ? 'No se pudo enviar el enlace. Revisa el email e inténtalo de nuevo.'
+          : 'Te envié un enlace por email. Ábrelo en este dispositivo para entrar.';
+      });
+
+      document.getElementById('cerrar-sesion').addEventListener('click', () => sb.auth.signOut());
+
+      sb.auth.onAuthStateChange((evento, s) => {
+        const u = s ? s.user : null;
+        if ((u && u.id) === (usuario && usuario.id)) return;
+        // setTimeout: Supabase recomienda no llamar a su API dentro de este callback.
+        setTimeout(() => {
+          if (u) {
+            alEntrar(u);
+          } else {
+            usuario = null;
+            tareas = cargar();
+            actualizar();
+            pintarCuenta();
+          }
+        }, 0);
+      });
+
+      // Al volver a la pestaña, trae los cambios hechos desde otro dispositivo.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && usuario) cargarRemoto();
+      });
+    }
 
     // Modo claro / oscuro
     const btnTema = document.getElementById('btn-tema');
