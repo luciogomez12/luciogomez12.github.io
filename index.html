@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lucio Gomez</title>
+  <script>
+    // Aplica el tema guardado antes de pintar la página (evita un parpadeo).
+    try {
+      const t = localStorage.getItem('tema');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1d2330;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #e0e9ff;
+      --danger: #dc2626;
+      --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+    }
+    :root { color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --bg: #0f1218;
+        --card: #181c24;
+        --text: #e6e8ec;
+        --muted: #9aa1ad;
+        --border: #2a303b;
+        --accent: #5b8cff;
+        --accent-hover: #7aa2ff;
+        --accent-soft: #1f2a44;
+        --danger: #f87171;
+        --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3);
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0f1218;
+      --card: #181c24;
+      --text: #e6e8ec;
+      --muted: #9aa1ad;
+      --border: #2a303b;
+      --accent: #5b8cff;
+      --accent-hover: #7aa2ff;
+      --accent-soft: #1f2a44;
+      --danger: #f87171;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    /* Cabecera */
+    header { padding: 72px 0 40px; position: relative; }
+    .btn-tema {
+      position: absolute; top: 20px; right: 0;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: .9rem;
+      box-shadow: var(--shadow);
+    }
+    .btn-tema:hover { border-color: var(--accent); }
+    .avatar {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700; font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(2rem, 6vw, 3rem);
+      line-height: 1.1;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .rol { margin: 0; font-size: 1.15rem; color: var(--muted); }
+
+    /* Tarjetas */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h2 { font-size: 1.25rem; margin: 0 0 12px; }
+    .card p { margin: 0; }
+
+    /* Tareas */
+    form { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type="text"] {
+      flex: 1; min-width: 0;
+      font: inherit;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    input[type="text"]:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: transparent;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+    }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn-primary {
+      padding: 10px 18px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    ul { list-style: none; margin: 0; padding: 0; }
+    li {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    li:last-child { border-bottom: none; }
+    li input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    li span { flex: 1; overflow-wrap: anywhere; }
+    li.hecha span { text-decoration: line-through; color: var(--muted); }
+    .btn-borrar {
+      background: none;
+      color: var(--muted);
+      font-size: 1.3rem;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+    .btn-borrar:hover { color: var(--danger); }
+
+    .vacio { color: var(--muted); text-align: center; padding: 16px 0; }
+    .pie-tareas {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap;
+      margin-top: 12px;
+      font-size: .9rem; color: var(--muted);
+    }
+    .btn-link {
+      background: none; color: var(--muted);
+      padding: 4px 0; text-decoration: underline;
+    }
+    .btn-link:hover { color: var(--danger); }
+    [hidden] { display: none !important; }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: .875rem;
+      padding: 24px 0 48px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- ✏️ Cambia aquí tu nombre, iniciales y profesión -->
+    <header>
+      <button type="button" class="btn-tema" id="btn-tema"></button>
+      <div class="avatar" aria-hidden="true">LG</div>
+      <h1>Lucio Gomez</h1>
+      <p class="rol">Ingeniero Civil · Subcontratos en Mundo Construcciones</p>
+    </header>
+
+    <main>
+      <!-- ✏️ Cambia aquí tu texto "Sobre mí" -->
+      <section class="card">
+        <h2>Sobre mí</h2>
+        <p>
+          Hola, soy Lucio Gomez, Ingeniero Civil. Trabajo en Mundo Construcciones,
+          en el área de subcontratos.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Mis tareas</h2>
+        <form id="form-tarea">
+          <input type="text" id="nueva-tarea" placeholder="¿Qué tienes que hacer?" autocomplete="off" aria-label="Nueva tarea">
+          <button type="submit" class="btn-primary">Añadir</button>
+        </form>
+        <ul id="lista"></ul>
+        <p class="vacio" id="vacio">No hay tareas. ¡Añade la primera!</p>
+        <div class="pie-tareas" id="pie-tareas">
+          <span id="contador"></span>
+          <button type="button" class="btn-link" id="borrar-hechas">Borrar completadas</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>© <span id="anio"></span> Lucio Gomez</footer>
+  </div>
+
+  <script>
+    const CLAVE = 'mis-tareas';
+    const lista = document.getElementById('lista');
+    const form = document.getElementById('form-tarea');
+    const entrada = document.getElementById('nueva-tarea');
+    const vacio = document.getElementById('vacio');
+    const pie = document.getElementById('pie-tareas');
+    const contador = document.getElementById('contador');
+    const borrarHechas = document.getElementById('borrar-hechas');
+
+    function cargar() {
+      try {
+        const datos = JSON.parse(localStorage.getItem(CLAVE));
+        return Array.isArray(datos) ? datos : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function guardar() {
+      try {
+        localStorage.setItem(CLAVE, JSON.stringify(tareas));
+      } catch {
+        // Almacenamiento bloqueado: la lista sigue funcionando sin guardar.
+      }
+    }
+
+    let tareas = cargar();
+
+    function pintar() {
+      lista.replaceChildren();
+      for (const t of tareas) {
+        const li = document.createElement('li');
+        if (t.hecha) li.classList.add('hecha');
+
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = t.hecha;
+        check.setAttribute('aria-label', 'Marcar como hecha');
+        check.addEventListener('change', () => {
+          t.hecha = check.checked;
+          actualizar();
+        });
+
+        const texto = document.createElement('span');
+        texto.textContent = t.texto;
+
+        const borrar = document.createElement('button');
+        borrar.type = 'button';
+        borrar.className = 'btn-borrar';
+        borrar.textContent = '×';
+        borrar.setAttribute('aria-label', 'Borrar tarea');
+        borrar.addEventListener('click', () => {
+          tareas = tareas.filter(x => x.id !== t.id);
+          actualizar();
+        });
+
+        li.append(check, texto, borrar);
+        lista.append(li);
+      }
+
+      const pendientes = tareas.filter(t => !t.hecha).length;
+      vacio.hidden = tareas.length > 0;
+      pie.hidden = tareas.length === 0;
+      contador.textContent = pendientes === 1 ? '1 pendiente' : `${pendientes} pendientes`;
+      borrarHechas.hidden = !tareas.some(t => t.hecha);
+    }
+
+    function actualizar() {
+      guardar();
+      pintar();
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const texto = entrada.value.trim();
+      if (!texto) return;
+      tareas.push({ id: Date.now() + Math.random(), texto, hecha: false });
+      entrada.value = '';
+      entrada.focus();
+      actualizar();
+    });
+
+    borrarHechas.addEventListener('click', () => {
+      tareas = tareas.filter(t => !t.hecha);
+      actualizar();
+    });
+
+    // Modo claro / oscuro
+    const btnTema = document.getElementById('btn-tema');
+    const raiz = document.documentElement;
+    const sistemaOscuro = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function temaActual() {
+      return raiz.dataset.theme || (sistemaOscuro.matches ? 'dark' : 'light');
+    }
+
+    function pintarBotonTema() {
+      const oscuro = temaActual() === 'dark';
+      btnTema.textContent = oscuro ? '☀️ Modo claro' : '🌙 Modo oscuro';
+      btnTema.setAttribute('aria-label', oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    }
+
+    btnTema.addEventListener('click', () => {
+      const nuevo = temaActual() === 'dark' ? 'light' : 'dark';
+      raiz.dataset.theme = nuevo;
+      try { localStorage.setItem('tema', nuevo); } catch {}
+      pintarBotonTema();
+    });
+    sistemaOscuro.addEventListener('change', pintarBotonTema);
+    pintarBotonTema();
+
+    document.getElementById('anio').textContent = new Date().getFullYear();
+    pintar();
+  </script>
+</body>
+</html>
